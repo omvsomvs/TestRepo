@@ -1,0 +1,34 @@
+# Missing Arrival - simple version.
+# Just source this file - it immediately runs and produces output
+# For a real flow, should be wrapped in a proc
+
+# REQUIRES THE FOLLOWING BEFORE MATCH_TOPOLOGY
+set timing_save_pin_arrival_and_transition true
+# THIS ISN'T A REQUIREMENT, BUT PROBABLY A GOOD IDEA
+set timing_enable_reachability_optimization true
+
+
+# Post trace-paths -- iterate over the nets, and look for missing arrivals
+set nets [get_net *]
+foreach_in_collection testnet $nets {
+  # Get pin timings
+  set timing_vertices [get_pins -quiet -of $testnet -leaf -filter "is_timing_vertex == true"]
+  set min_rises [sizeof_collection [filter_collection $timing_vertices "defined(min_rise_arrival)"]]
+  set max_rises [sizeof_collection [filter_collection $timing_vertices "defined(max_rise_arrival)"]]
+  set min_falls [sizeof_collection [filter_collection $timing_vertices "defined(min_fall_arrival)"]]
+  set max_falls [sizeof_collection [filter_collection $timing_vertices "defined(max_fall_arrival)"]]
+ 
+  # Seperately get timing for output port if it exists
+  set testport [get_port -quiet -of $testnet]
+  if {[get_attribute -quiet $testport output_delay_rise_max] != ""} { incr max_rises }
+  if {[get_attribute -quiet $testport output_delay_rise_min] != ""} { incr min_rises }
+  if {[get_attribute -quiet $testport output_delay_fall_max] != ""} { incr max_falls }
+  if {[get_attribute -quiet $testport output_delay_fall_min] != ""} { incr min_falls }
+
+  if {[sizeof_collection $timing_vertices]>0 || [sizeof_collection [get_port -quiet -of $testnet]]>0} {
+    if {$min_rises == 0 || $max_rises == 0 || $min_falls == 0 || $max_falls == 0} {
+      set name [get_attribute $testnet full_name]
+      puts "Coverage problem at node $name: $min_rises : $min_falls : $max_rises : $max_falls"
+    }
+  }
+}
